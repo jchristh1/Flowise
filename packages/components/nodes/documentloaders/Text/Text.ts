@@ -1,8 +1,8 @@
-import { INode, INodeData, INodeOutputsValue, INodeParams } from '../../../src/Interface'
+import { ICommonObject, INode, INodeData, INodeOutputsValue, INodeParams } from '../../../src/Interface'
 import { TextSplitter } from 'langchain/text_splitter'
 import { TextLoader } from 'langchain/document_loaders/fs/text'
-import { Document } from 'langchain/document'
-import { handleEscapeCharacters } from '../../../src'
+import { Document } from '@langchain/core/documents'
+import { getFileFromStorage, handleEscapeCharacters } from '../../../src'
 
 class Text_DocumentLoaders implements INode {
     label: string
@@ -51,17 +51,19 @@ class Text_DocumentLoaders implements INode {
             {
                 label: 'Document',
                 name: 'document',
-                baseClasses: this.baseClasses
+                description: 'Array of document objects containing metadata and pageContent',
+                baseClasses: [...this.baseClasses, 'json']
             },
             {
                 label: 'Text',
                 name: 'text',
+                description: 'Concatenated string from pageContent of documents',
                 baseClasses: ['string', 'json']
             }
         ]
     }
 
-    async init(nodeData: INodeData): Promise<any> {
+    async init(nodeData: INodeData, _: string, options: ICommonObject): Promise<any> {
         const textSplitter = nodeData.inputs?.textSplitter as TextSplitter
         const txtFileBase64 = nodeData.inputs?.txtFile as string
         const metadata = nodeData.inputs?.metadata
@@ -70,25 +72,50 @@ class Text_DocumentLoaders implements INode {
         let alldocs = []
         let files: string[] = []
 
-        if (txtFileBase64.startsWith('[') && txtFileBase64.endsWith(']')) {
-            files = JSON.parse(txtFileBase64)
-        } else {
-            files = [txtFileBase64]
-        }
-
-        for (const file of files) {
-            const splitDataURI = file.split(',')
-            splitDataURI.pop()
-            const bf = Buffer.from(splitDataURI.pop() || '', 'base64')
-            const blob = new Blob([bf])
-            const loader = new TextLoader(blob)
-
-            if (textSplitter) {
-                const docs = await loader.loadAndSplit(textSplitter)
-                alldocs.push(...docs)
+        //FILE-STORAGE::["CONTRIBUTING.md","LICENSE.md","README.md"]
+        if (txtFileBase64.startsWith('FILE-STORAGE::')) {
+            const fileName = txtFileBase64.replace('FILE-STORAGE::', '')
+            if (fileName.startsWith('[') && fileName.endsWith(']')) {
+                files = JSON.parse(fileName)
             } else {
-                const docs = await loader.load()
-                alldocs.push(...docs)
+                files = [fileName]
+            }
+            const chatflowid = options.chatflowid
+
+            for (const file of files) {
+                const fileData = await getFileFromStorage(file, chatflowid)
+                const blob = new Blob([fileData])
+                const loader = new TextLoader(blob)
+
+                if (textSplitter) {
+                    const docs = await loader.loadAndSplit(textSplitter)
+                    alldocs.push(...docs)
+                } else {
+                    const docs = await loader.load()
+                    alldocs.push(...docs)
+                }
+            }
+        } else {
+            if (txtFileBase64.startsWith('[') && txtFileBase64.endsWith(']')) {
+                files = JSON.parse(txtFileBase64)
+            } else {
+                files = [txtFileBase64]
+            }
+
+            for (const file of files) {
+                const splitDataURI = file.split(',')
+                splitDataURI.pop()
+                const bf = Buffer.from(splitDataURI.pop() || '', 'base64')
+                const blob = new Blob([bf])
+                const loader = new TextLoader(blob)
+
+                if (textSplitter) {
+                    const docs = await loader.loadAndSplit(textSplitter)
+                    alldocs.push(...docs)
+                } else {
+                    const docs = await loader.load()
+                    alldocs.push(...docs)
+                }
             }
         }
 
