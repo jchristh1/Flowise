@@ -58,7 +58,9 @@ export class ConsoleCallbackHandler extends BaseTracer {
     constructor(logger: Logger) {
         super()
         this.logger = logger
-        logger.level = getEnvironmentVariable('LOG_LEVEL') ?? 'info'
+        if (getEnvironmentVariable('DEBUG') === 'true') {
+            logger.level = getEnvironmentVariable('LOG_LEVEL') ?? 'info'
+        }
     }
 
     getParents(run: Run) {
@@ -631,7 +633,8 @@ export class AnalyticHandler {
         const returnIds: ICommonObject = {
             langSmith: {},
             langFuse: {},
-            lunary: {}
+            lunary: {},
+            langWatch: {}
         }
 
         if (Object.prototype.hasOwnProperty.call(this.handlers, 'langSmith')) {
@@ -787,7 +790,8 @@ export class AnalyticHandler {
         const returnIds: ICommonObject = {
             langSmith: {},
             langFuse: {},
-            lunary: {}
+            lunary: {},
+            langWatch: {}
         }
 
         if (Object.prototype.hasOwnProperty.call(this.handlers, 'langSmith')) {
